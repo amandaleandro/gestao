@@ -1,0 +1,39 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: a2y
+      POSTGRES_PASSWORD: a2y_dev_password
+      POSTGRES_DB: a2y_prospeccao
+    ports:
+      - "5439:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U a2y -d a2y_prospeccao"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://a2y:a2y_dev_password@db:5432/a2y_prospeccao
+      AUTH_SECRET: 3e2124f30a1a7133371fc28e6e755d90e8715917427225f651307fe1aa0df2f1
+      NODE_ENV: production
+      UPLOAD_DIR: /app/uploads
+    ports:
+      - "3010:3000"
+    volumes:
+      - uploads_data:/app/uploads
+
+volumes:
+  db_data:
+  uploads_data:

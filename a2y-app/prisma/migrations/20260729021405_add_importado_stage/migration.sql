@@ -1,0 +1,5 @@
+-- AlterEnum
+ALTER TYPE "StageStatus" ADD VALUE 'IMPORTADO';
+
+-- AlterTable
+ALTER TABLE "Client" ALTER COLUMN "stage" SET DEFAULT 'IMPORTADO';
