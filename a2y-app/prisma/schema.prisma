@@ -131,7 +131,7 @@ model Proposal {
   clientId        String
   client          Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
   version         Int            @default(1)
-  publicToken     String?        @unique
+  publicToken     String         @unique @default(cuid())
   title           String
   context         String?
   problems        String?
