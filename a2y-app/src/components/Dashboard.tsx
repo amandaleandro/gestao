@@ -13,6 +13,7 @@ interface DashboardData {
   activeClients: number;
   overdueCount: number;
   soldRevenue: number;
+  receivedRevenue: number;
   mrr: number;
 }
 
@@ -56,16 +57,32 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
-    const timeoutId = window.setTimeout(() => void loadDashboard(), 0);
+    const timeoutId = window.setTimeout(() => {
+      void loadDashboard();
+    }, 0);
     return () => window.clearTimeout(timeoutId);
   }, [loadDashboard]);
 
   if (isLoading && !data) {
-    return <div className="grid gap-4 sm:grid-cols-3" aria-label="Carregando dashboard">{[1, 2, 3].map((key) => <div key={key} className="h-24 animate-pulse rounded-xl border border-slate-200 bg-white p-4"><div className="h-3 w-24 rounded bg-slate-200"/><div className="mt-4 h-7 w-16 rounded bg-slate-200"/></div>)}</div>;
+    return (
+      <div className="grid gap-4 sm:grid-cols-3" aria-label="Carregando dashboard">
+        {[1, 2, 3].map((key) => (
+          <div key={key} className="h-24 animate-pulse rounded-xl border border-slate-200 bg-white p-4">
+            <div className="h-3 w-24 rounded bg-slate-200" />
+            <div className="mt-4 h-7 w-16 rounded bg-slate-200" />
+          </div>
+        ))}
+      </div>
+    );
   }
 
   if (error || !data) {
-    return <div className="rounded-xl border border-red-200 bg-red-50 p-5 text-sm text-red-800"><p className="font-semibold">Não foi possível carregar o dashboard.</p><button type="button" onClick={() => void loadDashboard()} className="mt-4 rounded-lg bg-red-700 px-3 py-2 text-xs font-semibold text-white">Tentar novamente</button></div>;
+    return (
+      <div className="rounded-xl border border-red-200 bg-red-50 p-5 text-sm text-red-800">
+        <p className="font-semibold">Não foi possível carregar o dashboard.</p>
+        <button type="button" onClick={() => void loadDashboard()} className="mt-4 rounded-lg bg-red-700 px-3 py-2 text-xs font-semibold text-white">Tentar novamente</button>
+      </div>
+    );
   }
 
   const maxStageCount = Math.max(1, ...data.byStage.map((stage) => stage.count));
@@ -77,7 +94,7 @@ export default function Dashboard() {
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#0344F0]">Visão comercial</p>
           <h2 className="mt-1 text-xl font-semibold text-slate-950">Receita, funil e implantação</h2>
-          <p className="mt-1 text-sm text-slate-500">Da entrada do lead até o cliente ativo.</p>
+          <p className="mt-1 text-sm text-slate-500">Da entrada do lead até o cliente ativo, separando venda contratada de caixa recebido.</p>
         </div>
         <button type="button" onClick={() => void loadDashboard()} disabled={isLoading} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-blue-300 hover:text-[#0344F0] disabled:opacity-60">{isLoading ? "Atualizando..." : "Atualizar dados"}</button>
       </div>
@@ -87,7 +104,8 @@ export default function Dashboard() {
         <div className="rounded-xl border border-blue-100 bg-blue-50 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-[#0344F0]">Conversão decidida</p><p className="mt-2 text-3xl font-semibold text-blue-950">{data.conversionRate.toFixed(1)}%</p></div>
         <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Vendas ganhas</p><p className="mt-2 text-3xl font-semibold text-emerald-950">{data.closedWon}</p><p className="mt-1 text-xs text-emerald-700">{data.closedThisMonth} neste mês</p></div>
         <div className="rounded-xl border border-violet-100 bg-violet-50 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-violet-700">Clientes ativos</p><p className="mt-2 text-3xl font-semibold text-violet-950">{data.activeClients}</p></div>
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Receita vendida</p><p className="mt-2 text-2xl font-semibold text-slate-950">{money(data.soldRevenue)}</p></div>
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Receita vendida</p><p className="mt-2 text-2xl font-semibold text-slate-950">{money(data.soldRevenue)}</p><p className="mt-1 text-xs text-slate-500">Implantações aceitas</p></div>
+        <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Receita recebida</p><p className="mt-2 text-2xl font-semibold text-emerald-950">{money(data.receivedRevenue)}</p><p className="mt-1 text-xs text-emerald-700">Implantações com pagamento confirmado</p></div>
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">MRR contratado</p><p className="mt-2 text-2xl font-semibold text-slate-950">{money(data.mrr)}</p></div>
         <div className="rounded-xl border border-amber-100 bg-amber-50 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Follow-ups atrasados</p><p className="mt-2 text-3xl font-semibold text-amber-950">{data.overdueCount}</p></div>
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Propostas</p><p className="mt-2 text-3xl font-semibold text-slate-950">{data.proposals.reduce((sum, proposal) => sum + proposal.count, 0)}</p></div>
