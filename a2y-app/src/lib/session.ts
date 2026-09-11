@@ -2,8 +2,8 @@ import "server-only";
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 
-const secretKey = process.env.AUTH_SECRET ?? process.env.SESSION_SECRET;
-if (!secretKey) throw new Error("AUTH_SECRET ou SESSION_SECRET não configurado.");
+const secretKey = process.env.AUTH_SECRET;
+if (!secretKey) throw new Error("AUTH_SECRET não configurado.");
 const encodedKey = new TextEncoder().encode(secretKey);
 
 const COOKIE_NAME = "a2y_session";
