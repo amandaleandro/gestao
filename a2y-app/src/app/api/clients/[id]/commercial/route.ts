@@ -49,6 +49,14 @@ function isEnumValue<T extends Record<string, string>>(enumObject: T, value: unk
   return typeof value === "string" && value in enumObject;
 }
 
+async function hasPaidAcceptedProposal(clientId: string): Promise<boolean> {
+  const proposal = await prisma.proposal.findFirst({
+    where: { clientId, status: "ACEITA", paidAt: { not: null } },
+    select: { id: true },
+  });
+  return Boolean(proposal);
+}
+
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -187,7 +195,9 @@ export async function PATCH(
       },
     });
 
-    if (status === "ENVIADA") await prisma.client.update({ where: { id }, data: { stage: "PROPOSTA_ENVIADA" } });
+    if (status === "ENVIADA") {
+      await prisma.client.update({ where: { id }, data: { stage: "PROPOSTA_ENVIADA" } });
+    }
     if (status === "ACEITA") {
       await prisma.$transaction([
         prisma.client.update({
@@ -199,10 +209,12 @@ export async function PATCH(
             recurringValue: proposal.monthlyPrice,
           },
         }),
-        prisma.onboarding.upsert({
-          where: { clientId: id },
-          update: { status: "EM_ANDAMENTO" },
-          create: { clientId: id, status: "EM_ANDAMENTO", data: {} },
+        prisma.activity.create({
+          data: {
+            clientId: id,
+            type: "NOTA",
+            content: `Proposta v${proposal.version} marcada como aceita internamente. Aguardando confirmação do pagamento da implantação.`,
+          },
         }),
       ]);
     }
@@ -216,6 +228,9 @@ export async function PATCH(
   }
 
   if (section === "onboarding") {
+    if (!(await hasPaidAcceptedProposal(id))) {
+      return NextResponse.json({ error: "Onboarding só é liberado após aceite e pagamento confirmado da implantação." }, { status: 409 });
+    }
     if (body.status !== undefined && !isEnumValue(OnboardingStatus, body.status)) {
       return NextResponse.json({ error: "Status de onboarding inválido." }, { status: 400 });
     }
@@ -239,6 +254,10 @@ export async function PATCH(
   }
 
   if (section === "implementation") {
+    const onboarding = await prisma.onboarding.findUnique({ where: { clientId: id }, select: { status: true } });
+    if (onboarding?.status !== "CONCLUIDO") {
+      return NextResponse.json({ error: "Implantação só pode ser iniciada após a conclusão do onboarding." }, { status: 409 });
+    }
     if (body.status !== undefined && !isEnumValue(ImplementationStatus, body.status)) {
       return NextResponse.json({ error: "Status de implantação inválido." }, { status: 400 });
     }
