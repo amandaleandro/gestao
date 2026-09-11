@@ -1,4 +1,5 @@
 import ClientDetail from "@/components/ClientDetail";
+import CommercialLifecycle from "@/components/CommercialLifecycle";
 
 export default async function ClientDetailPage({
   params,
@@ -10,6 +11,7 @@ export default async function ClientDetailPage({
   return (
     <div className="min-h-screen bg-[#f4f7f8] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
       <ClientDetail clientId={id} />
+      <CommercialLifecycle clientId={id} />
     </div>
   );
 }
