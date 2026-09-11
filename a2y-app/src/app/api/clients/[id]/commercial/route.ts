@@ -1,11 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
+import {
+  ImplementationStatus,
+  OnboardingStatus,
+  ProposalStatus,
+  StageStatus,
+} from "@/generated/prisma/enums";
 
 async function requireSession() {
   const session = await getSession();
-  if (!session) return null;
-  return session;
+  return session ?? null;
+}
+
+async function canAccessClient(clientId: string, userId: string): Promise<boolean> {
+  const [user, client] = await Promise.all([
+    prisma.user.findUnique({ where: { id: userId }, select: { role: true } }),
+    prisma.client.findUnique({ where: { id: clientId }, select: { assignedToId: true } }),
+  ]);
+  if (!user || !client) return false;
+  return user.role === "ADMIN" || !client.assignedToId || client.assignedToId === userId;
 }
 
 function str(value: unknown, max = 5000): string | null {
@@ -20,10 +34,19 @@ function num(value: unknown): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function integer(value: unknown): number | null {
+  const parsed = num(value);
+  return parsed === null ? null : Math.max(0, Math.round(parsed));
+}
+
 function date(value: unknown): Date | null {
   if (typeof value !== "string" || !value.trim()) return null;
   const parsed = new Date(value);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function isEnumValue<T extends Record<string, string>>(enumObject: T, value: unknown): value is T[keyof T] {
+  return typeof value === "string" && value in enumObject;
 }
 
 export async function GET(
@@ -34,6 +57,10 @@ export async function GET(
   if (!session) return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
 
   const { id } = await params;
+  if (!(await canAccessClient(id, session.userId))) {
+    return NextResponse.json({ error: "Cliente não encontrado ou sem acesso." }, { status: 404 });
+  }
+
   const client = await prisma.client.findUnique({
     where: { id },
     include: {
@@ -71,13 +98,18 @@ export async function PATCH(
   if (!session) return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
 
   const { id } = await params;
-  const client = await prisma.client.findUnique({ where: { id }, select: { id: true } });
-  if (!client) return NextResponse.json({ error: "Cliente não encontrado." }, { status: 404 });
+  if (!(await canAccessClient(id, session.userId))) {
+    return NextResponse.json({ error: "Cliente não encontrado ou sem acesso." }, { status: 404 });
+  }
 
   const body = await request.json();
   const section = body.section;
 
   if (section === "opportunity") {
+    if (body.stage !== undefined && !isEnumValue(StageStatus, body.stage)) {
+      return NextResponse.json({ error: "Etapa inválida." }, { status: 400 });
+    }
+
     const updated = await prisma.client.update({
       where: { id },
       data: {
@@ -86,44 +118,33 @@ export async function PATCH(
         recurringValue: body.recurringValue === undefined ? undefined : num(body.recurringValue),
         lostReason: body.lostReason === undefined ? undefined : str(body.lostReason, 1200),
         closedAt: body.closedAt === undefined ? undefined : date(body.closedAt),
-        stage: body.stage || undefined,
+        stage: body.stage === undefined ? undefined : body.stage,
       },
     });
     return NextResponse.json(updated);
   }
 
   if (section === "diagnosis") {
+    const monthlyLeadVolume = integer(body.monthlyLeadVolume);
+    const teamSize = integer(body.teamSize);
+    const diagnosisData = {
+      leadSource: str(body.leadSource, 300),
+      monthlyLeadVolume,
+      channels: str(body.channels, 1000),
+      teamSize,
+      currentControl: str(body.currentControl, 2000),
+      quoteProcess: str(body.quoteProcess, 3000),
+      followUpProcess: str(body.followUpProcess, 3000),
+      averageTicket: num(body.averageTicket),
+      bottlenecks: str(body.bottlenecks, 5000),
+      priority: str(body.priority, 1000),
+      recommendedSolution: str(body.recommendedSolution, 5000),
+    };
+
     const diagnosis = await prisma.diagnosis.upsert({
       where: { clientId: id },
-      update: {
-        leadSource: str(body.leadSource, 300),
-        monthlyLeadVolume: num(body.monthlyLeadVolume) === null ? null : Math.round(num(body.monthlyLeadVolume)!),
-        channels: str(body.channels, 1000),
-        teamSize: num(body.teamSize) === null ? null : Math.round(num(body.teamSize)!),
-        currentControl: str(body.currentControl, 2000),
-        quoteProcess: str(body.quoteProcess, 3000),
-        followUpProcess: str(body.followUpProcess, 3000),
-        averageTicket: num(body.averageTicket),
-        bottlenecks: str(body.bottlenecks, 5000),
-        priority: str(body.priority, 1000),
-        recommendedSolution: str(body.recommendedSolution, 5000),
-        completedAt: body.completed ? new Date() : undefined,
-      },
-      create: {
-        clientId: id,
-        leadSource: str(body.leadSource, 300),
-        monthlyLeadVolume: num(body.monthlyLeadVolume) === null ? null : Math.round(num(body.monthlyLeadVolume)!),
-        channels: str(body.channels, 1000),
-        teamSize: num(body.teamSize) === null ? null : Math.round(num(body.teamSize)!),
-        currentControl: str(body.currentControl, 2000),
-        quoteProcess: str(body.quoteProcess, 3000),
-        followUpProcess: str(body.followUpProcess, 3000),
-        averageTicket: num(body.averageTicket),
-        bottlenecks: str(body.bottlenecks, 5000),
-        priority: str(body.priority, 1000),
-        recommendedSolution: str(body.recommendedSolution, 5000),
-        completedAt: body.completed ? new Date() : null,
-      },
+      update: { ...diagnosisData, completedAt: body.completed ? new Date() : undefined },
+      create: { clientId: id, ...diagnosisData, completedAt: body.completed ? new Date() : null },
     });
 
     if (body.completed) {
@@ -135,8 +156,14 @@ export async function PATCH(
   if (section === "proposal") {
     const proposalId = str(body.proposalId, 100);
     if (!proposalId) return NextResponse.json({ error: "proposalId é obrigatório." }, { status: 400 });
+    if (body.status !== undefined && !isEnumValue(ProposalStatus, body.status)) {
+      return NextResponse.json({ error: "Status de proposta inválido." }, { status: 400 });
+    }
 
-    const status = body.status as string | undefined;
+    const belongsToClient = await prisma.proposal.findFirst({ where: { id: proposalId, clientId: id }, select: { id: true } });
+    if (!belongsToClient) return NextResponse.json({ error: "Proposta não encontrada." }, { status: 404 });
+
+    const status = body.status as ProposalStatus | undefined;
     const now = new Date();
     const proposal = await prisma.proposal.update({
       where: { id: proposalId },
@@ -151,8 +178,9 @@ export async function PATCH(
         setupPrice: body.setupPrice === undefined ? undefined : num(body.setupPrice),
         monthlyPrice: body.monthlyPrice === undefined ? undefined : num(body.monthlyPrice),
         validUntil: body.validUntil === undefined ? undefined : date(body.validUntil),
-        status: status as never,
+        status,
         sentAt: status === "ENVIADA" ? now : undefined,
+        viewedAt: status === "VISUALIZADA" ? now : undefined,
         acceptedAt: status === "ACEITA" ? now : undefined,
         rejectedAt: status === "RECUSADA" ? now : undefined,
         rejectionNote: body.rejectionNote === undefined ? undefined : str(body.rejectionNote, 2000),
@@ -178,33 +206,47 @@ export async function PATCH(
         }),
       ]);
     }
+    if (status === "RECUSADA") {
+      await prisma.client.update({
+        where: { id },
+        data: { stage: "FECHADO_PERDIDO", lostReason: str(body.rejectionNote, 2000), closedAt: now },
+      });
+    }
     return NextResponse.json(proposal);
   }
 
   if (section === "onboarding") {
+    if (body.status !== undefined && !isEnumValue(OnboardingStatus, body.status)) {
+      return NextResponse.json({ error: "Status de onboarding inválido." }, { status: 400 });
+    }
+    const status = (body.status ?? "EM_ANDAMENTO") as OnboardingStatus;
     const onboarding = await prisma.onboarding.upsert({
       where: { clientId: id },
       update: {
-        status: body.status || undefined,
+        status,
         data: body.data ?? undefined,
-        completedAt: body.status === "CONCLUIDO" ? new Date() : undefined,
+        completedAt: status === "CONCLUIDO" ? new Date() : undefined,
       },
       create: {
         clientId: id,
-        status: body.status || "EM_ANDAMENTO",
+        status,
         data: body.data ?? {},
-        completedAt: body.status === "CONCLUIDO" ? new Date() : null,
+        completedAt: status === "CONCLUIDO" ? new Date() : null,
       },
     });
-    await prisma.client.update({ where: { id }, data: { stage: body.status === "CONCLUIDO" ? "IMPLANTACAO" : "ONBOARDING" } });
+    await prisma.client.update({ where: { id }, data: { stage: status === "CONCLUIDO" ? "IMPLANTACAO" : "ONBOARDING" } });
     return NextResponse.json(onboarding);
   }
 
   if (section === "implementation") {
+    if (body.status !== undefined && !isEnumValue(ImplementationStatus, body.status)) {
+      return NextResponse.json({ error: "Status de implantação inválido." }, { status: 400 });
+    }
+    const status = (body.status ?? "PLANEJADA") as ImplementationStatus;
     const implementation = await prisma.implementation.upsert({
       where: { clientId: id },
       update: {
-        status: body.status || undefined,
+        status,
         checklist: body.checklist ?? undefined,
         metricsBefore: body.metricsBefore ?? undefined,
         metricsAfter: body.metricsAfter ?? undefined,
@@ -213,11 +255,11 @@ export async function PATCH(
         caseNotes: body.caseNotes === undefined ? undefined : str(body.caseNotes, 4000),
         startedAt: body.startedAt === undefined ? undefined : date(body.startedAt),
         dueAt: body.dueAt === undefined ? undefined : date(body.dueAt),
-        completedAt: body.status === "CONCLUIDA" ? new Date() : undefined,
+        completedAt: status === "CONCLUIDA" ? new Date() : undefined,
       },
       create: {
         clientId: id,
-        status: body.status || "PLANEJADA",
+        status,
         checklist: body.checklist ?? [],
         metricsBefore: body.metricsBefore ?? null,
         metricsAfter: body.metricsAfter ?? null,
@@ -226,10 +268,10 @@ export async function PATCH(
         caseNotes: str(body.caseNotes, 4000),
         startedAt: date(body.startedAt),
         dueAt: date(body.dueAt),
-        completedAt: body.status === "CONCLUIDA" ? new Date() : null,
+        completedAt: status === "CONCLUIDA" ? new Date() : null,
       },
     });
-    await prisma.client.update({ where: { id }, data: { stage: body.status === "CONCLUIDA" ? "ATIVO" : "IMPLANTACAO" } });
+    await prisma.client.update({ where: { id }, data: { stage: status === "CONCLUIDA" ? "ATIVO" : "IMPLANTACAO" } });
     return NextResponse.json(implementation);
   }
 
@@ -244,6 +286,10 @@ export async function POST(
   if (!session) return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
 
   const { id } = await params;
+  if (!(await canAccessClient(id, session.userId))) {
+    return NextResponse.json({ error: "Cliente não encontrado ou sem acesso." }, { status: 404 });
+  }
+
   const body = await request.json();
   if (body.action !== "create-proposal") {
     return NextResponse.json({ error: "Ação inválida." }, { status: 400 });
