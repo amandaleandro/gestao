@@ -5,15 +5,21 @@ import { FormEvent, useEffect, useState } from "react";
 export default function PublicProposalAcceptance({
   token,
   initialStatus,
+  initialPaymentUrl,
+  initialPaidAt,
 }: {
   token: string;
   initialStatus: string;
+  initialPaymentUrl?: string | null;
+  initialPaidAt?: string | null;
 }) {
   const [status, setStatus] = useState(initialStatus);
   const [state, setState] = useState<"idle" | "sending" | "success" | "error">(
     initialStatus === "ACEITA" ? "success" : "idle"
   );
   const [message, setMessage] = useState("");
+  const [paymentUrl, setPaymentUrl] = useState(initialPaymentUrl ?? null);
+  const [paid, setPaid] = useState(Boolean(initialPaidAt));
 
   useEffect(() => {
     if (["RASCUNHO", "ACEITA", "RECUSADA", "EXPIRADA"].includes(initialStatus)) return;
@@ -52,6 +58,8 @@ export default function PublicProposalAcceptance({
     }
 
     setStatus("ACEITA");
+    setPaymentUrl(typeof data.paymentUrl === "string" ? data.paymentUrl : null);
+    setPaid(Boolean(data.paid));
     setState("success");
   }
 
@@ -68,12 +76,30 @@ export default function PublicProposalAcceptance({
   }
 
   if (state === "success" || status === "ACEITA") {
+    if (paid) {
+      return (
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-6">
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-700">Pagamento confirmado</p>
+          <h3 className="mt-2 text-xl font-semibold text-emerald-950">Próxima etapa: onboarding.</h3>
+          <p className="mt-2 text-sm leading-6 text-emerald-800">A proposta e o pagamento da implantação já estão confirmados. Agora precisamos do contexto operacional para preparar a implantação.</p>
+          <a href={`/onboarding/${token}`} className="mt-5 inline-flex w-full items-center justify-center rounded-xl bg-emerald-700 px-4 py-3 text-sm font-bold text-white transition hover:bg-emerald-800">Iniciar onboarding →</a>
+        </div>
+      );
+    }
+
     return (
-      <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-6">
-        <p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-700">Aceite registrado</p>
-        <h3 className="mt-2 text-xl font-semibold text-emerald-950">Próxima etapa: onboarding.</h3>
-        <p className="mt-2 text-sm leading-6 text-emerald-800">A A2Y já recebeu a confirmação. Agora precisamos do contexto operacional para preparar a implantação.</p>
-        <a href={`/onboarding/${token}`} className="mt-5 inline-flex w-full items-center justify-center rounded-xl bg-emerald-700 px-4 py-3 text-sm font-bold text-white transition hover:bg-emerald-800">Iniciar onboarding →</a>
+      <div className="rounded-2xl border border-blue-200 bg-blue-50 p-6">
+        <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#0344F0]">Aceite registrado</p>
+        <h3 className="mt-2 text-xl font-semibold text-[#071827]">Falta confirmar a implantação.</h3>
+        <p className="mt-2 text-sm leading-6 text-slate-700">O onboarding é liberado somente depois que o pagamento da implantação for confirmado pela A2Y.</p>
+        {paymentUrl ? (
+          <>
+            <a href={paymentUrl} target="_blank" rel="noreferrer" className="mt-5 inline-flex w-full items-center justify-center rounded-xl bg-[#0344F0] px-4 py-3 text-sm font-bold text-white transition hover:bg-[#0239c9]">Ir para pagamento ↗</a>
+            <p className="mt-3 text-xs leading-5 text-slate-500">Após o pagamento, a A2Y confirma o recebimento e libera o onboarding neste mesmo link.</p>
+          </>
+        ) : (
+          <p className="mt-4 rounded-xl border border-blue-200 bg-white/70 p-4 text-sm leading-6 text-slate-600">A A2Y enviará as instruções de pagamento. Depois da confirmação, esta página passa a liberar o onboarding.</p>
+        )}
       </div>
     );
   }
@@ -103,7 +129,7 @@ export default function PublicProposalAcceptance({
       <button type="submit" disabled={state === "sending"} className="mt-5 w-full rounded-xl bg-[#0344F0] px-5 py-3.5 text-sm font-bold text-white transition hover:bg-[#0239c9] disabled:opacity-60">
         {state === "sending" ? "Registrando aceite..." : "Aceitar proposta"}
       </button>
-      <p className="mt-3 text-xs leading-5 text-slate-500">Quando necessário, contrato e documentos fiscais seguem o processo comercial aplicável ao projeto.</p>
+      <p className="mt-3 text-xs leading-5 text-slate-500">O aceite comercial não inicia a implantação sozinho. O onboarding é liberado depois da confirmação do pagamento da implantação.</p>
     </form>
   );
 }
