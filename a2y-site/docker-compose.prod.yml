@@ -1,0 +1,17 @@
+services:
+  site:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: a2y-site
+    restart: unless-stopped
+    env_file:
+      - .env.production
+    ports:
+      - "127.0.0.1:3012:3000"
+    networks:
+      - shared_caddy_net
+
+networks:
+  shared_caddy_net:
+    external: true
