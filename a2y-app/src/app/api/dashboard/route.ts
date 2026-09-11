@@ -1,8 +1,26 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+const WON_STAGES = ["FECHADO_GANHO", "ONBOARDING", "IMPLANTACAO", "ATIVO"] as const;
+
 export async function GET() {
-  const [byStage, byCategory, totalClosed, closedWon, closedThisMonth, totalClients, overdueCount] = await Promise.all([
+  const monthStart = new Date();
+  monthStart.setDate(1);
+  monthStart.setHours(0, 0, 0, 0);
+
+  const [
+    byStage,
+    byCategory,
+    lostCount,
+    closedWon,
+    closedThisMonth,
+    totalClients,
+    overdueCount,
+    revenue,
+    receivedRevenue,
+    activeClients,
+    proposals,
+  ] = await Promise.all([
     prisma.client.groupBy({ by: ["stage"], _count: { _all: true } }),
     prisma.client.groupBy({
       by: ["category"],
@@ -10,36 +28,50 @@ export async function GET() {
       orderBy: { _count: { category: "desc" } },
       take: 10,
     }),
-    prisma.client.count({
-      where: { stage: { in: ["FECHADO_GANHO", "FECHADO_PERDIDO"] } },
-    }),
-    prisma.client.count({ where: { stage: "FECHADO_GANHO" } }),
+    prisma.client.count({ where: { stage: "FECHADO_PERDIDO" } }),
+    prisma.client.count({ where: { stage: { in: [...WON_STAGES] } } }),
     prisma.client.count({
       where: {
-        stage: "FECHADO_GANHO",
-        updatedAt: { gte: new Date(new Date().setDate(1)) },
+        stage: { in: [...WON_STAGES] },
+        closedAt: { gte: monthStart },
       },
     }),
     prisma.client.count(),
     prisma.client.count({
       where: {
         nextContactAt: { lt: new Date() },
-        stage: { notIn: ["FECHADO_GANHO", "FECHADO_PERDIDO"] },
+        stage: { notIn: ["FECHADO_PERDIDO", "ATIVO"] },
       },
     }),
+    prisma.client.aggregate({
+      where: { stage: { in: [...WON_STAGES] } },
+      _sum: { opportunityValue: true, recurringValue: true },
+    }),
+    prisma.proposal.aggregate({
+      where: { status: "ACEITA", paidAt: { not: null } },
+      _sum: { setupPrice: true },
+    }),
+    prisma.client.count({ where: { stage: "ATIVO" } }),
+    prisma.proposal.groupBy({ by: ["status"], _count: { _all: true } }),
   ]);
 
-  const conversionRate = totalClosed > 0 ? (closedWon / totalClosed) * 100 : 0;
+  const totalDecided = closedWon + lostCount;
+  const conversionRate = totalDecided > 0 ? (closedWon / totalDecided) * 100 : 0;
 
   return NextResponse.json({
-    byStage: byStage.map((s) => ({ stage: s.stage, count: s._count._all })),
+    byStage: byStage.map((stage) => ({ stage: stage.stage, count: stage._count._all })),
     byCategory: byCategory
-      .filter((c) => c.category)
-      .map((c) => ({ category: c.category, count: c._count._all })),
+      .filter((category) => category.category)
+      .map((category) => ({ category: category.category, count: category._count._all })),
+    proposals: proposals.map((proposal) => ({ status: proposal.status, count: proposal._count._all })),
     conversionRate,
     closedWon,
     closedThisMonth,
     totalClients,
+    activeClients,
     overdueCount,
+    soldRevenue: revenue._sum.opportunityValue ?? 0,
+    receivedRevenue: receivedRevenue._sum.setupPrice ?? 0,
+    mrr: revenue._sum.recurringValue ?? 0,
   });
 }

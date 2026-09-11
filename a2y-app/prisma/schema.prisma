@@ -30,40 +30,164 @@ enum StageStatus {
   NOVO
   CONTATADO
   INTERESSADO
+  REUNIAO_MARCADA
+  DIAGNOSTICO_REALIZADO
   PROPOSTA_ENVIADA
+  NEGOCIACAO
   FECHADO_GANHO
   FECHADO_PERDIDO
+  ONBOARDING
+  IMPLANTACAO
+  ATIVO
+}
+
+enum ProposalStatus {
+  RASCUNHO
+  ENVIADA
+  VISUALIZADA
+  ACEITA
+  RECUSADA
+  EXPIRADA
+}
+
+enum OnboardingStatus {
+  RASCUNHO
+  EM_ANDAMENTO
+  CONCLUIDO
+}
+
+enum ImplementationStatus {
+  PLANEJADA
+  EM_ANDAMENTO
+  BLOQUEADA
+  CONCLUIDA
 }
 
 model Client {
-  id            String       @id @default(cuid())
-  name          String
-  category      String?
-  phone         String?
-  whatsapp      String?
-  email         String?
-  address       String?
-  city          String?
-  state         String?
-  website       String?
-  googleMapsUrl String?
-  rating        Float?
-  reviewsCount  Int?
-  notes         String?
-  stage         StageStatus  @default(IMPORTADO)
-  source        String       @default("google_maps")
-  nextContactAt DateTime?
-  assignedToId  String?
-  assignedTo    User?        @relation("ClientAssignedTo", fields: [assignedToId], references: [id], onDelete: SetNull)
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
-  activities    Activity[]
-  attachments   Attachment[]
+  id               String       @id @default(cuid())
+  externalId       String?      @unique
+  name             String
+  category         String?
+  phone            String?
+  whatsapp         String?
+  email            String?
+  address          String?
+  city             String?
+  state            String?
+  website          String?
+  googleMapsUrl    String?
+  rating           Float?
+  reviewsCount     Int?
+  notes            String?
+  stage            StageStatus  @default(IMPORTADO)
+  source           String       @default("google_maps")
+  nextContactAt    DateTime?
+  meetingAt        DateTime?
+  opportunityValue Float?
+  recurringValue   Float?
+  closedAt         DateTime?
+  lostReason       String?
+  assignedToId     String?
+  assignedTo       User?        @relation("ClientAssignedTo", fields: [assignedToId], references: [id], onDelete: SetNull)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  activities       Activity[]
+  attachments      Attachment[]
+  diagnosis        Diagnosis?
+  proposals        Proposal[]
+  onboarding       Onboarding?
+  implementation   Implementation?
 
   @@index([stage])
   @@index([city])
+  @@index([source])
   @@index([nextContactAt])
+  @@index([meetingAt])
   @@index([assignedToId])
+}
+
+model Diagnosis {
+  id                  String   @id @default(cuid())
+  clientId            String   @unique
+  client              Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  leadSource          String?
+  monthlyLeadVolume   Int?
+  channels            String?
+  teamSize            Int?
+  currentControl      String?
+  quoteProcess        String?
+  followUpProcess     String?
+  averageTicket       Float?
+  bottlenecks         String?
+  priority            String?
+  recommendedSolution String?
+  completedAt         DateTime?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+model Proposal {
+  id              String         @id @default(cuid())
+  clientId        String
+  client          Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  version         Int            @default(1)
+  publicToken     String         @unique @default(cuid())
+  title           String
+  context         String?
+  problems        String?
+  solution        String?
+  scope           String?
+  exclusions      String?
+  timeline        String?
+  setupPrice      Float?
+  monthlyPrice    Float?
+  validUntil      DateTime?
+  paymentUrl      String?
+  paidAt          DateTime?
+  status          ProposalStatus @default(RASCUNHO)
+  sentAt          DateTime?
+  viewedAt        DateTime?
+  acceptedAt      DateTime?
+  rejectedAt      DateTime?
+  rejectionNote   String?
+  acceptanceName  String?
+  acceptanceEmail String?
+  acceptedTermsAt DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@index([clientId, status])
+  @@index([createdAt])
+  @@index([paidAt])
+}
+
+model Onboarding {
+  id          String           @id @default(cuid())
+  clientId    String           @unique
+  client      Client           @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  status      OnboardingStatus @default(RASCUNHO)
+  data        Json?
+  completedAt DateTime?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}
+
+model Implementation {
+  id             String               @id @default(cuid())
+  clientId       String               @unique
+  client         Client               @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  status         ImplementationStatus @default(PLANEJADA)
+  checklist      Json?
+  startedAt      DateTime?
+  dueAt          DateTime?
+  completedAt    DateTime?
+  metricsBefore  Json?
+  metricsAfter   Json?
+  caseConsent    Boolean?
+  caseAnonymous  Boolean              @default(false)
+  caseNotes      String?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
 }
 
 model Attachment {
@@ -102,10 +226,10 @@ model Activity {
 }
 
 model ImportBatch {
-  id          String   @id @default(cuid())
-  fileName    String
-  totalRows   Int
+  id           String   @id @default(cuid())
+  fileName     String
+  totalRows    Int
   importedRows Int
-  skippedRows Int
-  createdAt   DateTime @default(now())
+  skippedRows  Int
+  createdAt    DateTime @default(now())
 }
