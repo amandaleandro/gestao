@@ -8,6 +8,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    env_file:
+      - .env.production
     environment:
       DATABASE_URL: postgresql://a2y:${DB_PASSWORD}@db:5432/a2y_prospeccao
       AUTH_SECRET: ${AUTH_SECRET}
