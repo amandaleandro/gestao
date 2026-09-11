@@ -31,7 +31,13 @@ export async function POST(
   if (!proposal) return NextResponse.json({ error: "Proposta não encontrada." }, { status: 404 });
 
   if (proposal.status === "ACEITA") {
-    return NextResponse.json({ ok: true, alreadyAccepted: true, acceptedAt: proposal.acceptedAt });
+    return NextResponse.json({
+      ok: true,
+      alreadyAccepted: true,
+      acceptedAt: proposal.acceptedAt,
+      paid: Boolean(proposal.paidAt),
+      paymentUrl: proposal.paymentUrl,
+    });
   }
 
   if (["RECUSADA", "EXPIRADA"].includes(proposal.status)) {
@@ -69,19 +75,19 @@ export async function POST(
         email: proposal.client.email ?? email,
       },
     }),
-    prisma.onboarding.upsert({
-      where: { clientId: proposal.clientId },
-      update: { status: "EM_ANDAMENTO" },
-      create: { clientId: proposal.clientId, status: "EM_ANDAMENTO", data: {} },
-    }),
     prisma.activity.create({
       data: {
         clientId: proposal.clientId,
         type: "NOTA",
-        content: `Proposta v${proposal.version} aceita por ${name} (${email}).`,
+        content: `Proposta v${proposal.version} aceita por ${name} (${email}). Aguardando confirmação do pagamento da implantação.`,
       },
     }),
   ]);
 
-  return NextResponse.json({ ok: true, acceptedAt: now.toISOString() });
+  return NextResponse.json({
+    ok: true,
+    acceptedAt: now.toISOString(),
+    paid: Boolean(proposal.paidAt),
+    paymentUrl: proposal.paymentUrl,
+  });
 }
