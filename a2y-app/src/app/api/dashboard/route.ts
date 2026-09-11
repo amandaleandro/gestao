@@ -17,6 +17,7 @@ export async function GET() {
     totalClients,
     overdueCount,
     revenue,
+    receivedRevenue,
     activeClients,
     proposals,
   ] = await Promise.all([
@@ -46,6 +47,10 @@ export async function GET() {
       where: { stage: { in: [...WON_STAGES] } },
       _sum: { opportunityValue: true, recurringValue: true },
     }),
+    prisma.proposal.aggregate({
+      where: { status: "ACEITA", paidAt: { not: null } },
+      _sum: { setupPrice: true },
+    }),
     prisma.client.count({ where: { stage: "ATIVO" } }),
     prisma.proposal.groupBy({ by: ["status"], _count: { _all: true } }),
   ]);
@@ -66,6 +71,7 @@ export async function GET() {
     activeClients,
     overdueCount,
     soldRevenue: revenue._sum.opportunityValue ?? 0,
+    receivedRevenue: receivedRevenue._sum.setupPrice ?? 0,
     mrr: revenue._sum.recurringValue ?? 0,
   });
 }
