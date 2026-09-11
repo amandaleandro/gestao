@@ -72,7 +72,8 @@ export default function PublicProposalAcceptance({
       <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-6">
         <p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-700">Aceite registrado</p>
         <h3 className="mt-2 text-xl font-semibold text-emerald-950">Próxima etapa: onboarding.</h3>
-        <p className="mt-2 text-sm leading-6 text-emerald-800">A A2Y já recebeu a confirmação. A implantação começa após os passos comerciais e dados necessários serem concluídos.</p>
+        <p className="mt-2 text-sm leading-6 text-emerald-800">A A2Y já recebeu a confirmação. Agora precisamos do contexto operacional para preparar a implantação.</p>
+        <a href={`/onboarding/${token}`} className="mt-5 inline-flex w-full items-center justify-center rounded-xl bg-emerald-700 px-4 py-3 text-sm font-bold text-white transition hover:bg-emerald-800">Iniciar onboarding →</a>
       </div>
     );
   }
