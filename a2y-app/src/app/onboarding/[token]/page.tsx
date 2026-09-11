@@ -2,6 +2,18 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import PublicOnboardingForm from "@/components/PublicOnboardingForm";
 
+function Blocked({ title, description }: { title: string; description: string }) {
+  return (
+    <main className="grid min-h-screen place-items-center bg-[#f4f7f8] px-5">
+      <div className="max-w-lg rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+        <span className="mx-auto grid h-11 w-11 place-items-center rounded-lg bg-[#0344F0] text-sm font-black text-white">A2Y</span>
+        <h1 className="mt-5 text-2xl font-semibold tracking-[-0.03em] text-[#071827]">{title}</h1>
+        <p className="mt-3 text-sm leading-6 text-slate-600">{description}</p>
+      </div>
+    </main>
+  );
+}
+
 export default async function PublicOnboardingPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
   const proposal = await prisma.proposal.findUnique({
@@ -21,15 +33,11 @@ export default async function PublicOnboardingPage({ params }: { params: Promise
   if (!proposal) notFound();
 
   if (proposal.status !== "ACEITA") {
-    return (
-      <main className="grid min-h-screen place-items-center bg-[#f4f7f8] px-5">
-        <div className="max-w-lg rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm">
-          <span className="mx-auto grid h-11 w-11 place-items-center rounded-lg bg-[#0344F0] text-sm font-black text-white">A2Y</span>
-          <h1 className="mt-5 text-2xl font-semibold tracking-[-0.03em] text-[#071827]">Onboarding ainda indisponível</h1>
-          <p className="mt-3 text-sm leading-6 text-slate-600">O briefing de implantação é liberado depois que a proposta comercial for aceita.</p>
-        </div>
-      </main>
-    );
+    return <Blocked title="Onboarding ainda indisponível" description="O briefing de implantação é liberado depois que a proposta comercial for aceita." />;
+  }
+
+  if (!proposal.paidAt) {
+    return <Blocked title="Aguardando confirmação de pagamento" description="O briefing de implantação será liberado assim que o pagamento da implantação for confirmado pela A2Y." />;
   }
 
   const rawData = proposal.client.onboarding?.data;
