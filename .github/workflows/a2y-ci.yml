@@ -1,0 +1,55 @@
+name: A2Y CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "a2y-app/**"
+      - "a2y-site/**"
+      - ".github/workflows/a2y-ci.yml"
+  push:
+    branches: [main]
+    paths:
+      - "a2y-app/**"
+      - "a2y-site/**"
+      - ".github/workflows/a2y-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  crm:
+    name: CRM · lint & build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: a2y-app
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/a2y
+      SESSION_SECRET: ci-only-secret
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: a2y-app/package-lock.json
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npm run lint
+      - run: npm run build
+
+  site:
+    name: Site · lint & build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: a2y-site
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - run: npm run lint
+      - run: npm run build
