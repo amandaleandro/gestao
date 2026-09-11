@@ -127,28 +127,32 @@ model Diagnosis {
 }
 
 model Proposal {
-  id            String         @id @default(cuid())
-  clientId      String
-  client        Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  version       Int            @default(1)
-  title         String
-  context       String?
-  problems      String?
-  solution      String?
-  scope         String?
-  exclusions    String?
-  timeline      String?
-  setupPrice    Float?
-  monthlyPrice  Float?
-  validUntil    DateTime?
-  status        ProposalStatus @default(RASCUNHO)
-  sentAt        DateTime?
-  viewedAt      DateTime?
-  acceptedAt    DateTime?
-  rejectedAt    DateTime?
-  rejectionNote String?
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  id              String         @id @default(cuid())
+  clientId        String
+  client          Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  version         Int            @default(1)
+  publicToken     String?        @unique
+  title           String
+  context         String?
+  problems        String?
+  solution        String?
+  scope           String?
+  exclusions      String?
+  timeline        String?
+  setupPrice      Float?
+  monthlyPrice    Float?
+  validUntil      DateTime?
+  status          ProposalStatus @default(RASCUNHO)
+  sentAt          DateTime?
+  viewedAt        DateTime?
+  acceptedAt      DateTime?
+  rejectedAt      DateTime?
+  rejectionNote   String?
+  acceptanceName  String?
+  acceptanceEmail String?
+  acceptedTermsAt DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
 
   @@index([clientId, status])
   @@index([createdAt])
