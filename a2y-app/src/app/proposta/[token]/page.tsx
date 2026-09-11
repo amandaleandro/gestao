@@ -75,7 +75,12 @@ export default async function PublicProposalPage({ params }: { params: Promise<{
             </div>
           </div>
 
-          <PublicProposalAcceptance token={token} initialStatus={effectiveStatus} />
+          <PublicProposalAcceptance
+            token={token}
+            initialStatus={effectiveStatus}
+            initialPaymentUrl={proposal.paymentUrl}
+            initialPaidAt={proposal.paidAt?.toISOString() ?? null}
+          />
         </aside>
       </div>
 
