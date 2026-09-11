@@ -142,6 +142,8 @@ model Proposal {
   setupPrice      Float?
   monthlyPrice    Float?
   validUntil      DateTime?
+  paymentUrl      String?
+  paidAt          DateTime?
   status          ProposalStatus @default(RASCUNHO)
   sentAt          DateTime?
   viewedAt        DateTime?
@@ -156,6 +158,7 @@ model Proposal {
 
   @@index([clientId, status])
   @@index([createdAt])
+  @@index([paidAt])
 }
 
 model Onboarding {
