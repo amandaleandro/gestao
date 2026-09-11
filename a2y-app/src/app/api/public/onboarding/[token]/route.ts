@@ -40,12 +40,15 @@ export async function POST(
   const { token } = await params;
   const proposal = await prisma.proposal.findUnique({
     where: { publicToken: token },
-    select: { id: true, clientId: true, status: true },
+    select: { id: true, clientId: true, status: true, paidAt: true },
   });
 
   if (!proposal) return NextResponse.json({ error: "Link inválido." }, { status: 404 });
   if (proposal.status !== "ACEITA") {
     return NextResponse.json({ error: "O onboarding fica disponível após o aceite da proposta." }, { status: 403 });
+  }
+  if (!proposal.paidAt) {
+    return NextResponse.json({ error: "O onboarding será liberado após a confirmação do pagamento da implantação." }, { status: 403 });
   }
 
   const body = await request.json();
